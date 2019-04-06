@@ -1,0 +1,48 @@
+Máquina de estados
+
+INIT -> 
+pines de RFID, sensores de peso, LEDs y botones
+conexión WiFi -> si no hay conexión, no hace nada -> prender LED rojo
+
+ERROR ->
+Si no hay WiFi, prender LED rojo y sonar buzzer
+¿Cómo indicar que no hay internet a la nube?
+
+LOOP ->
+<<< OPCIONAL >>>
+LOOP cada 12 horas <validación>
+Solicitar JSON de inventario ... leer sensores de peso ... si match, mandar OK, si no, mandar nuevos valores
+
+LOOP principal
+CHECK-OUT
+Espera lectura de RFID y checar lista, si no está, añadir ID en lista ... 
+solicita JSON de nube, espera respuesta ... 
+recibir número [posible JSON] y separar en bits -> iniciar timer, prender LEDs
+TIMEOUT menor (pequeños timeouts para validar)
+	leer todos los sensores de peso y validar contra lo esperado que tome
+	si tomó todo,
+		responder con JSON de materiales tomados (valores negativos para lo quitado)
+		romper TIMEOUTs
+	si tomó un material que no debe, prender LED rojo
+TIMEOUT mayor
+	si no o tomó algo equivocado,
+	responder con JSON de materiales tomados,
+	sonar buzzer y mandar JSON a nube (código de error)
+	terminar timer de posible error
+
+CHECK-IN
+Espera lectura de RFID y checamos si está en lista ... solicita JSON a nube ... 
+inicia TIMEOUT mayor y LEDs de qué se espera devolver
+	al terminar timer, checar botones e ignorar sensores de peso marcados
+	leer sensores de peso y comparar contra JSON
+		si el valor es cero o negativo, mandar JSON a nube (código de error)
+		si es positivo, mandar JSON de nuevos valores a nube
+
+
+{
+	"OK": True/False (1,0)
+	"pintura roja": 30
+	"pintura azul": 12
+	"barniz": 21
+}
+

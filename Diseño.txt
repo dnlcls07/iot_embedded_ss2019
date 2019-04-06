@@ -1,0 +1,65 @@
+--Variables globales
+JSONs definidos:
+	solicitar inventario
+tamaño de array [ver notas]
+
+--Funciones de init
+RFID_init()
+WIFI_init()
+SENSOR_init() [botones, LEDs y buzzer]
+
+--Funciones de error
+WIFI_error() [LED rojo y buzzer esporádico]
+JSON_error() [JSON con código de error]
+
+--Funciones de loop
+RFID_readCard() - leer RFID y convertir ID a número
+RFID_check_checkouts(int ID) - checar si ID en lista, si no, añadir
+CLOUD_put(JSON object) - mandar JSON a nube y esperar respuesta, retornar respuesta
+SENSOR_checkout(JSON object) - recibe JSON [de CLOUD_put], saca datos, crea número [para saber qué leer y qué validar] prende LEDs e inicia timer
+WEIGHT_read(int sensors_to_read) - leer todos los sensores de peso indicados y alimentar array, responder con puntero a array y setear tamaño de array [o puntero a estructura de tamaño y puntero]
+WEIGHT_checkout_validate() / WEIGHT_checkin_validate() - comparar array de pesos contra valores en JSON de pesos,
+si tomó de más, prender LED rojo correspondiente [posible función extra]
+SENSOR_set_led() - prender LEDs para checkin
+si tomó todo, mandar True, si no o tomó de más, False
+BUTTON_read() - leer si hay interrupciones de botón, retornar ID de botón [como teclado matricial]
+
+--Loop
+	RFID_readCard()
+	RFID_check_checkouts(int ID)
+	if checkout:
+		loop_checkout()
+	if checkin:
+		loop_checkin()
+
+	loop_checkout():
+		CLOUD_put() [L19]
+		SENSOR_checkout() [L20]
+		---timer---
+		WEIGHT_read() [L22]
+		WEIGHT_checkout_validate() [L22-25]
+		if ok:
+		CLOUD_put() [romper timer y count]
+		elif error:
+		JSON_error() [romper timer y count]
+		else:
+		count++
+		--count--
+		JSON_error()
+
+	loop_checkin():
+		CLOUD_put() [L34]
+		--timer--
+		BUTTON_read() [L36]
+		WEIGHT_read(int sensors_to_read) [L37]
+		WEIGHT_checkin_validate() [L37]
+		if ok:
+		CLOUD_put() [romper timer y count]
+		elif error:
+		JSON_error() [romper timer y count] 
+		else:
+		count++
+		--count--
+		JSON_error()
+		
+
