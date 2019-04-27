@@ -3,9 +3,11 @@
 ****************************************************/
 #include <SPI.h>                  //SPI data
 #include <MFRC522.h>              //RFID module
-#include <ESP8266WiFi.h>          //Wi-Fi connection
+#include <ESP8266WiFi.h>          //Wi-Fi connectio
+#include <HX711_ADC.h>            //HX711 load
+#include <Wire.h>                 //HX711 load
 #include <ESP8266HTTPClient.h>    //HTTP comm
-//#include <ArduinoJson.h>        //Json
+#include <ArduinoJson.h>          //Json
 /***************************************************
                    DEFINES
 ****************************************************/
@@ -18,20 +20,25 @@
 #define LED_3_PIN       10              //Led 3 pin 10
 #define LED_4_PIN       13              //Led 4 pin 13
 #define LED_ERROR_PIN   16              //Error led pin 16 (In mcu)
-//TODO: Falta inicializar los pines de sensores de peso. Pines 1 y 3 pensados para eso. Estos pines pueden ser serial. RXD0 y TXD0
+#define LOAD_A_DATA     1               //Load A pin 1 - Data
+#define LOAD_A_SCK      3               //Load A pin 3 - Clock
+#define LOAD_B_DATA     0               //Load B pin 1 - Data
+#define LOAD_B_SCK      2               //Load B pin 3 - Clock
 
-#define HTTP_OK       200               //HTTP Response OK
-#define ID_LIST_NUM   10                //ID list max number
+#define ID_LIST_NUM     5               //ID list max number
+#define LOAD_A_FACTOR   999             //Calibration factor of load A
+#define LOAD_B_FACTOR   999             //Calibration factor of load B
 /***************************************************
                VARIABLES & CONSTANTS
 ****************************************************/
-const char* ssid = "BCG-PlazaP";        //Wi-Fi network name
-const char* password = "Caramelatte12"; //Wi-Fi network password
+const char* ssid = "BCG-PlazaP";                //Wi-Fi network name
+const char* password = "Caramelatte12";         //Wi-Fi network password
 
-int id_list[ID_LIST_NUM] = {0};         //List of ID's
-byte actual_id_num = 0;                 //Number of id's on ID's list
+long id_list[ID_LIST_NUM] = {0};                //List of ID's
 
-MFRC522 mfrc522(SS_PIN, RST_PIN);       //RC522 object
+MFRC522 mfrc522(SS_PIN, RST_PIN);               //RC522 object
+HX711_ADC LoadACell(LOAD_A_DATA, LOAD_A_SCK);   //Load A cell object (data pin, sck pin)
+HX711_ADC LoadBCell(LOAD_B_DATA, LOAD_B_SCK);   //Load B cell object (data pin, sck pin)
 /***************************************************
                     FUNCTIONS
 ****************************************************/
@@ -42,21 +49,30 @@ Initialize Sensors and Actuators pins
 */
 void SENSOR_Init()
 {
-  pinMode(LED_1_PIN, OUTPUT);       //Set LED_1_PIN as output
-  pinMode(LED_2_PIN, OUTPUT);       //Set LED_2_PIN as output
-  pinMode(LED_3_PIN, OUTPUT);       //Set LED_3_PIN as output
+  /*
+  LoadACell.begin();                        //Start connection to HX711
+  LoadACell.start(2000);                    //Load cells gets 2000ms of time to stabilize
+  LoadACell.setCalFactor(LOAD_A_FACTOR);    //Calibration factor for load cell
+  LoadBCell.begin();                        //Start connection to HX711
+  LoadBCell.start(2000);                    //Load cells gets 2000ms of time to stabilize
+  LoadBCell.setCalFactor(LOAD_B_FACTOR);    //Calibration factor for load cell
+  */
+  pinMode(LED_1_PIN, OUTPUT);       //Set LED_1_PIN as output.
+  digitalWrite(LED_1_PIN, LOW);     //Set LED_1_PIN value 0
+  //pinMode(LED_2_PIN, OUTPUT);       //Set LED_2_PIN as output. Pin 9 manda a reset el micro. NO USAR!!!!
+ /* pinMode(LED_3_PIN, OUTPUT);       //Set LED_3_PIN as output
   pinMode(LED_4_PIN, OUTPUT);       //Set LED_4_PIN as output
   pinMode(LED_ERROR_PIN, OUTPUT);   //Set LED_ERROR_PIN as output
   pinMode(PB_1_PIN, INPUT_PULLUP);  //Set PB_1_PIN as input with pull up resistor
   pinMode(PB_2_PIN, INPUT_PULLUP);  //Set PB_2_PIN as input with pull up resistor
 
   digitalWrite(LED_1_PIN, LOW);     //Set LED_1_PIN value 0
-  digitalWrite(LED_2_PIN, LOW);     //Set LED_2_PIN value 0
+  //digitalWrite(LED_2_PIN, LOW);     //Set LED_2_PIN value 0
   digitalWrite(LED_3_PIN, LOW);     //Set LED_3_PIN value 0
   digitalWrite(LED_4_PIN, LOW);     //Set LED_4_PIN value 0
   digitalWrite(LED_ERROR_PIN, LOW); //Set LED_ERROR_PIN value 0
-
-  //TODO: Falta inicializar los sensores de peso
+  */
+  Serial.println("Sensor pins initialized");
 }
 /*
 ------------------------
@@ -77,7 +93,6 @@ Initialize RFID module
 */
 void RFID_Init()
 {
-  Serial.println("RFID module init");
   SPI.begin();          //SPI Bus Initialization
   mfrc522.PCD_Init();   //MFRC522 Initialization
   Serial.println("RFID module initialized");
@@ -85,12 +100,12 @@ void RFID_Init()
 /*
 ------------------
 Read UID from RFID
-return: int of card id 
+return: long of card id 
 ------------------
 */
-int RFID_readCard()
+long RFID_readCard()
 {
-  int id_card = 0; 
+  long id_card = 0; 
   if ( mfrc522.PICC_ReadCardSerial()) 
     {
       Serial.print("Card UID:");
@@ -109,25 +124,32 @@ int RFID_readCard()
 --------------------------------------------------
 Check list of ID's that already asked for material 
 return: true:   new card id added (chekout)
-    false:  card id already on list (checkin)
+        false:  card id already on list (checkin)
 --------------------------------------------------
 */
-bool RFID_check_id_list(int id_to_look)
+bool RFID_check_id_list(long id_to_look)
 {
   bool id_added = true;
   byte i;
-  for(i = 0 ; i<actual_id_num ; i++)
+  for(i = 0 ; i<ID_LIST_NUM ; i++)
   {
     if(id_to_look == id_list[i])
     {
       id_added = false;
+      id_list[i] = 0;
       break;
     }
   }
   if(true == id_added)
   {
-    id_list[actual_id_num] = id_to_look;
-    actual_id_num++;
+    for(i = 0 ; i<ID_LIST_NUM ; i++)
+    {
+      if(0 == id_list[i])
+      {
+        id_list[i] = id_to_look;
+        break;
+      } 
+    }
   }
   return id_added; 
 }
@@ -176,7 +198,7 @@ bool WiFi_sendHttpRequest()
     {
       String response = http.getString();   
       Serial.println(response);     
-      if(HTTP_OK == httpResponseCode)                           //Positive response code 
+      if(200 == httpResponseCode)                           //Positive response code 
       {
         requestSent = true;
       }
@@ -228,37 +250,23 @@ bool WiFi_receiveHttpRequest()
 ****************************************************/
 void setup() 
 {
-  Serial.begin(115200);       //Serial comm init
-  SENSOR_Init();              //Push buttons, LEDS and weight sensors initialization
+  Serial.begin(9600);         //Serial comm init
+  Serial.println("Initialization");
+  SENSOR_Init();              //Push buttons, LEDS and LOAD sensors initialization
   RFID_Init();                //RFID initialization
-  WiFi_Init();                //Wi-Fi initialization
-  SENSOR_Init();             //Sensors initialization
+  //WiFi_Init();                //Wi-Fi initialization
   Serial.println("Lectura del UID");
-}
-/***************************************************
-                    CHECK-OUT LOOP
-****************************************************/
-void loop_checkout()
-{
-
-}
-/***************************************************
-                    CHECK-IN LOOP
-****************************************************/
-void loop_checkin()
-{
-  
 }
 /***************************************************
                     MAIN LOOP
 ****************************************************/
 void loop() 
 {
-  int card_id;
+  long card_id;
   bool card_added;
-
   if ( mfrc522.PICC_IsNewCardPresent())           //Check if there is a new card
   {  
+    Serial.println("Start");
     card_id = RFID_readCard();                    //Read new card UID
     card_added = RFID_check_id_list(card_id);     //Verify ID's list
     if(true == card_added)                        //CHECKOUT
@@ -270,6 +278,22 @@ void loop()
       loop_checkin();
     }
   } 
+}
+/***************************************************
+                    CHECK-OUT LOOP
+****************************************************/
+void loop_checkout()
+{
+  Serial.println("checkout");
+    digitalWrite(LED_1_PIN, HIGH);     //Set LED_1_PIN value 0    
+}
+/***************************************************
+                    CHECK-IN LOOP
+****************************************************/
+void loop_checkin()
+{
+  Serial.println("checkin");
+    digitalWrite(LED_1_PIN, LOW);     //Set LED_2_PIN value 0
 }
 
 
