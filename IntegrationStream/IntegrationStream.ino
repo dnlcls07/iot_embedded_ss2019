@@ -5,7 +5,7 @@
 #include <MFRC522.h>              //RFID module
 #include <ESP8266WiFi.h>          //Wi-Fi connection
 #include <ESP8266HTTPClient.h>    //HTTP comm
-//#include <ArduinoJson.h>          //Json
+//#include <ArduinoJson.h>        //Json
 /***************************************************
                    DEFINES
 ****************************************************/
@@ -16,7 +16,7 @@
 #define LED_1_PIN       4               //Led 1 pin 4
 #define LED_2_PIN       9               //Led 2 pin 9
 #define LED_3_PIN       10              //Led 3 pin 10
-#define LED_4_PIN      13              //Led 4 pin 13
+#define LED_4_PIN       13              //Led 4 pin 13
 #define LED_ERROR_PIN   16              //Error led pin 16 (In mcu)
 //TODO: Falta inicializar los pines de sensores de peso. Pines 1 y 3 pensados para eso. Estos pines pueden ser serial. RXD0 y TXD0
 
