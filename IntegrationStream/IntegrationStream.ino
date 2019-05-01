@@ -16,7 +16,7 @@
 #define PB_1_PIN        12              //Push Button 1 pin 12
 #define PB_2_PIN        14              //Push Button 2 pin 14
 #define LED_1_PIN       4               //Led 1 pin 4
-#define LED_2_PIN       9               //Led 2 pin 9
+#define LED_2_PIN       12              //Led 2 pin 12
 #define LED_3_PIN       10              //Led 3 pin 10
 #define LED_4_PIN       13              //Led 4 pin 13
 #define LED_ERROR_PIN   16              //Error led pin 16 (In mcu)
@@ -28,6 +28,11 @@
 #define ID_LIST_NUM     5               //ID list max number
 #define LOAD_A_FACTOR   999             //Calibration factor of load A
 #define LOAD_B_FACTOR   999             //Calibration factor of load B
+
+#define MATERIAL_POS_1  0x01            //Mask position of material 1
+#define MATERIAL_POS_2  0x02            //Mask position of material 2
+#define MATERIAL_POS_3  0x04            //Mask position of material 3
+#define MATERIAL_POS_4  0x08            //Mask position of material 4
 /***************************************************
                VARIABLES & CONSTANTS
 ****************************************************/
@@ -58,16 +63,13 @@ void SENSOR_Init()
   LoadBCell.setCalFactor(LOAD_B_FACTOR);    //Calibration factor for load cell
   */
   pinMode(LED_1_PIN, OUTPUT);       //Set LED_1_PIN as output.
-  digitalWrite(LED_1_PIN, LOW);     //Set LED_1_PIN value 0
-  //pinMode(LED_2_PIN, OUTPUT);       //Set LED_2_PIN as output. Pin 9 manda a reset el micro. NO USAR!!!!
- /* pinMode(LED_3_PIN, OUTPUT);       //Set LED_3_PIN as output
+  pinMode(LED_2_PIN, OUTPUT);       //Set LED_2_PIN as output. Pin 9 manda a reset el micro. NO USAR!!!!
+  pinMode(LED_3_PIN, OUTPUT);       //Set LED_3_PIN as output
   pinMode(LED_4_PIN, OUTPUT);       //Set LED_4_PIN as output
   pinMode(LED_ERROR_PIN, OUTPUT);   //Set LED_ERROR_PIN as output
-  pinMode(PB_1_PIN, INPUT_PULLUP);  //Set PB_1_PIN as input with pull up resistor
-  pinMode(PB_2_PIN, INPUT_PULLUP);  //Set PB_2_PIN as input with pull up resistor
 
   digitalWrite(LED_1_PIN, LOW);     //Set LED_1_PIN value 0
-  //digitalWrite(LED_2_PIN, LOW);     //Set LED_2_PIN value 0
+  digitalWrite(LED_2_PIN, LOW);     //Set LED_2_PIN value 0 Pin 9 manda a reset el micro. NO USAR!!!!
   digitalWrite(LED_3_PIN, LOW);     //Set LED_3_PIN value 0
   digitalWrite(LED_4_PIN, LOW);     //Set LED_4_PIN value 0
   digitalWrite(LED_ERROR_PIN, LOW); //Set LED_ERROR_PIN value 0
@@ -75,16 +77,37 @@ void SENSOR_Init()
   Serial.println("Sensor pins initialized");
 }
 /*
-------------------------
-Read push buttons values
-------------------------
+---------------------------------------
+Turn on LEDs depending on data received
+---------------------------------------
 */
-void SENSOR_read_pushButtons()
-{ 
-  //TODO: Agregar dato de retorno 
-  byte push_buttons_pressed = 0;
-  digitalRead(PB_1_PIN);
-  digitalRead(PB_2_PIN);
+void SENSOR_changeLedState(int leds, int state)
+{
+   if(material_to_take & MATERIAL_POS_1)
+  {
+    digitalWrite(LED_1_PIN, state);     
+  }
+  if(material_to_take & MATERIAL_POS_2)
+  {
+    digitalWrite(LED_2_PIN, state);
+  }
+  if(material_to_take & MATERIAL_POS_3)
+  {
+    digitalWrite(LED_3_PIN, state);
+  }
+  if(material_to_take & MATERIAL_POS_4)
+  {
+    digitalWrite(LED_4_PIN, state);
+  }
+}
+/*
+----------------------------------------------------
+Receive cloud data and specify wich material to take
+----------------------------------------------------
+*/
+void SENSOR_showMaterial(int material_to_take)
+{
+  SENSOR_changeLedState(, HIGH);
 }
 /*
 ----------------------
@@ -177,74 +200,13 @@ void WiFi_Init()
 Send info through Wi-Fi, HTTP request PUT
 -----------------------------------------
 */
-/* 
- bool WiFi_sendHttpRequest(RFID info, Temperature info, Weight info)
- bool WiFi_sendHttpRequest(byte *uid, float temp, float weight)
- DEFINIR ARGUMENTOS DEPENDIENDO DE LOS SENSORES A USAR.
-*/
-bool WiFi_sendHttpRequest()
-{
-  bool requestSent = false;
-  if(WiFi.status()== WL_CONNECTED)
-  {
-    HTTPClient http;                                            //Create HTTP object
-   
-    http.begin("http://jsonplaceholder.typicode.com/posts/1");  
-    http.addHeader("Content-Type", "text/plain");               
-   
-    int httpResponseCode = http.PUT("body");                    //PUT Request
-   
-    if(httpResponseCode > 0)                                    //Get response code
-    {
-      String response = http.getString();   
-      Serial.println(response);     
-      if(200 == httpResponseCode)                           //Positive response code 
-      {
-        requestSent = true;
-      }
-    }
-    else
-    {
-      Serial.print("Error on sending PUT Request: ");
-    }
-    Serial.println(httpResponseCode);
-    http.end();
-   }
-   else
-   {
-      Serial.println("Error in WiFi connection");
-   }
-  //delay(10000);
-}
+
 /*
 --------------------------------------------
 Receive info through Wi-Fi, HTTP request GET
 --------------------------------------------
 */
-bool WiFi_receiveHttpRequest()
-{
-  bool requestSent = false;
-  if(WiFi.status()== WL_CONNECTED)
-  {
-    HTTPClient http;                                            //Create HTTP object
-   
-    http.begin("http://jsonplaceholder.typicode.com/posts/1");               
-   
-    int httpCode = http.GET();                                  //GET Request payload
-   
-    if(httpCode > 0)                                            //Get returning code
-    {
-      String payload = http.getString();   
-      Serial.println(payload);     
-    }
-    http.end();
-   }
-   else
-   {
-      Serial.println("Error in WiFi connection");
-   }
-  //delay(10000);
-}
+
 /***************************************************
                       SETUP
 ****************************************************/
@@ -266,34 +228,35 @@ void loop()
   bool card_added;
   if ( mfrc522.PICC_IsNewCardPresent())           //Check if there is a new card
   {  
-    Serial.println("Start");
     card_id = RFID_readCard();                    //Read new card UID
     card_added = RFID_check_id_list(card_id);     //Verify ID's list
+    
     if(true == card_added)                        //CHECKOUT
     {
-      loop_checkout();
+      loop_checkout(card_id);
     }
     else                                          //CHECKIN
     {
-      loop_checkin();
+      loop_checkin(card_id);
     }
   } 
 }
 /***************************************************
                     CHECK-OUT LOOP
 ****************************************************/
-void loop_checkout()
+void loop_checkout(long rfidCard)
 {
-  Serial.println("checkout");
-    digitalWrite(LED_1_PIN, HIGH);     //Set LED_1_PIN value 0    
+  int material_to_use = 0;
+  //enviar rfidCard a nube y recibir data
+  SENSOR_showMterial(material_to_use)
+  
 }
 /***************************************************
                     CHECK-IN LOOP
 ****************************************************/
-void loop_checkin()
+void loop_checkin(long rfidCard)
 {
-  Serial.println("checkin");
-    digitalWrite(LED_1_PIN, LOW);     //Set LED_2_PIN value 0
+  
 }
 
 
