@@ -14,30 +14,33 @@ void setup() {
 
 void loop() {
   // Revisamos si hay nuevas tarjetas  presentes
+  long print_id = 0;
   if ( mfrc522.PICC_IsNewCardPresent()) 
         {  
       //Seleccionamos una tarjeta
             if ( mfrc522.PICC_ReadCardSerial()) 
             {
                   // Enviamos serialemente su UID
-                  Serial.print("Card UID:");
+                  Serial.println();
+                  Serial.print("Card UID: ");
                   for (byte i = 0; i < mfrc522.uid.size; i++) {
-                          Serial.print(mfrc522.uid.uidByte[i] < 0x10 ? " 0" : " ");
-                          Serial.print(mfrc522.uid.uidByte[i], HEX);   
+                      print_id = (print_id << 8) | mfrc522.uid.uidByte[i];
+                      if(mfrc522.uid.uidByte[i] == 0)
+                      {
+                        Serial.print("00000000");
+                      }
+                      else
+                      {
+                        Serial.print(mfrc522.uid.uidByte[i], BIN);
+                      }
+                      //Serial.print(mfrc522.uid.uidByte[i] < 0x10 ? " 0" : " ");
+                      //Serial.print(mfrc522.uid.uidByte[i], HEX);   
                   } 
                   Serial.println();
+                  Serial.print("Full ID: ");
+                  Serial.print(print_id, BIN);
                   // Terminamos la lectura de la tarjeta  actual
                   mfrc522.PICC_HaltA();         
             }      
   } 
 }
-
-
-
-
-
-
-
-
-
-

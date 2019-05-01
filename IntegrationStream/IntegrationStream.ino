@@ -36,10 +36,12 @@
 /***************************************************
                VARIABLES & CONSTANTS
 ****************************************************/
-const char* ssid = "BCG-PlazaP";                //Wi-Fi network name
-const char* password = "Caramelatte12";         //Wi-Fi network password
+const char* ssid = "G7 ThinQ_0004";
+const char* password = "daceta1995";
 
-long id_list[ID_LIST_NUM] = {0};                //List of ID's
+uint32_t id_list[ID_LIST_NUM] = {0};                //List of ID's
+StaticJsonDocument<200> doc_send;
+StaticJsonDocument<200> doc_receive;
 
 MFRC522 mfrc522(SS_PIN, RST_PIN);               //RC522 object
 HX711_ADC LoadACell(LOAD_A_DATA, LOAD_A_SCK);   //Load A cell object (data pin, sck pin)
@@ -73,7 +75,7 @@ void SENSOR_Init()
   digitalWrite(LED_3_PIN, LOW);     //Set LED_3_PIN value 0
   digitalWrite(LED_4_PIN, LOW);     //Set LED_4_PIN value 0
   digitalWrite(LED_ERROR_PIN, LOW); //Set LED_ERROR_PIN value 0
-  */
+  
   Serial.println("Sensor pins initialized");
 }
 /*
@@ -81,23 +83,32 @@ void SENSOR_Init()
 Turn on LEDs depending on data received
 ---------------------------------------
 */
-void SENSOR_changeLedState(int leds, int state)
+void SENSOR_changeLedState(int material_to_take, int state)
 {
+  
    if(material_to_take & MATERIAL_POS_1)
   {
-    digitalWrite(LED_1_PIN, state);     
+    digitalWrite(LED_1_PIN, state); 
+    // TODO: remove   
+    Serial.println("Take first material"); 
   }
   if(material_to_take & MATERIAL_POS_2)
   {
     digitalWrite(LED_2_PIN, state);
+    // TODO: remove
+    Serial.println("Take second material"); 
   }
   if(material_to_take & MATERIAL_POS_3)
   {
     digitalWrite(LED_3_PIN, state);
+    // TODO: remove
+    Serial.println("Take third material"); 
   }
   if(material_to_take & MATERIAL_POS_4)
   {
     digitalWrite(LED_4_PIN, state);
+    // TODO: remove
+    Serial.println("Take fourth material"); 
   }
 }
 /*
@@ -107,7 +118,7 @@ Receive cloud data and specify wich material to take
 */
 void SENSOR_showMaterial(int material_to_take)
 {
-  SENSOR_changeLedState(, HIGH);
+  SENSOR_changeLedState(material_to_take, HIGH);
 }
 /*
 ----------------------
@@ -123,12 +134,12 @@ void RFID_Init()
 /*
 ------------------
 Read UID from RFID
-return: long of card id 
+return: uint32_t of card id 
 ------------------
 */
-long RFID_readCard()
+uint32_t RFID_readCard()
 {
-  long id_card = 0; 
+  uint32_t id_card = 0; 
   if ( mfrc522.PICC_ReadCardSerial()) 
     {
       Serial.print("Card UID:");
@@ -150,7 +161,7 @@ return: true:   new card id added (chekout)
         false:  card id already on list (checkin)
 --------------------------------------------------
 */
-bool RFID_check_id_list(long id_to_look)
+bool RFID_check_id_list(uint32_t id_to_look)
 {
   bool id_added = true;
   byte i;
@@ -200,12 +211,44 @@ void WiFi_Init()
 Send info through Wi-Fi, HTTP request PUT
 -----------------------------------------
 */
+String WiFi_Send(uint32_t id, int weight)
+{
+   String string_to_send = "";
+   String string_received = "";
+   if(WiFi.status()== WL_CONNECTED){
+   HTTPClient http;   
+   http.begin("http://us-central1-iot-primavera.cloudfunctions.net/function-1");
+   http.addHeader("Content-Type", "application/json");            
+   doc_send["id"] = id;
+   doc_send["weight"] = weight;
+   serializeJson(doc_send,string_to_send);
 
-/*
---------------------------------------------
-Receive info through Wi-Fi, HTTP request GET
---------------------------------------------
-*/
+   Serial.println(string_to_send);
+   int httpResponseCode = http.PUT(string_to_send);   
+   string_to_send = "";
+ 
+   if(httpResponseCode > 0){
+ 
+    String response = http.getString();
+    DeserializationError err = deserializeJson(doc_receive,response);
+    const char* parsed_data = doc_receive["data"];
+    string_received = parsed_data;
+ 
+    Serial.println(httpResponseCode);
+    Serial.println(response);          
+ 
+   }else{
+ 
+    Serial.print("Error on sending PUT Request: ");
+    Serial.println(httpResponseCode);
+ 
+   }
+   http.end();
+ }else{
+    Serial.println("Error in WiFi connection");
+ }
+ return string_received;
+}
 
 /***************************************************
                       SETUP
@@ -216,7 +259,7 @@ void setup()
   Serial.println("Initialization");
   SENSOR_Init();              //Push buttons, LEDS and LOAD sensors initialization
   RFID_Init();                //RFID initialization
-  //WiFi_Init();                //Wi-Fi initialization
+  WiFi_Init();                //Wi-Fi initialization
   Serial.println("Lectura del UID");
 }
 /***************************************************
@@ -224,11 +267,14 @@ void setup()
 ****************************************************/
 void loop() 
 {
-  long card_id;
+  uint32_t card_id;
   bool card_added;
   if ( mfrc522.PICC_IsNewCardPresent())           //Check if there is a new card
   {  
+    Serial.println("Reading card");
     card_id = RFID_readCard();                    //Read new card UID
+    Serial.print("Card ID:");
+    Serial.println(card_id);
     card_added = RFID_check_id_list(card_id);     //Verify ID's list
     
     if(true == card_added)                        //CHECKOUT
@@ -244,23 +290,24 @@ void loop()
 /***************************************************
                     CHECK-OUT LOOP
 ****************************************************/
-void loop_checkout(long rfidCard)
+void loop_checkout(uint32_t rfidCard)
 {
+  String material_received = "";
   int material_to_use = 0;
-  //enviar rfidCard a nube y recibir data
-  SENSOR_showMterial(material_to_use)
-  
+  // TODO: Reemplazar 10 por dato de sensor de peso
+  material_received = WiFi_Send(rfidCard, 10);
+  {
+    if (material_received == "Ok")
+    {
+     material_to_use = 7;
+    }
+  }
+  SENSOR_showMaterial(material_to_use);
 }
 /***************************************************
                     CHECK-IN LOOP
 ****************************************************/
-void loop_checkin(long rfidCard)
+void loop_checkin(uint32_t rfidCard)
 {
   
 }
-
-
-
-
-
-
