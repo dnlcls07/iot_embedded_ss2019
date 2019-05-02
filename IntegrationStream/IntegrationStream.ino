@@ -64,6 +64,8 @@ void SENSOR_Init()
   LoadBCell.start(2000);                    //Load cells gets 2000ms of time to stabilize
   LoadBCell.setCalFactor(LOAD_B_FACTOR);    //Calibration factor for load cell
   */
+
+  /*
   pinMode(LED_1_PIN, OUTPUT);       //Set LED_1_PIN as output.
   pinMode(LED_2_PIN, OUTPUT);       //Set LED_2_PIN as output. Pin 9 manda a reset el micro. NO USAR!!!!
   pinMode(LED_3_PIN, OUTPUT);       //Set LED_3_PIN as output
@@ -75,7 +77,7 @@ void SENSOR_Init()
   digitalWrite(LED_3_PIN, LOW);     //Set LED_3_PIN value 0
   digitalWrite(LED_4_PIN, LOW);     //Set LED_4_PIN value 0
   digitalWrite(LED_ERROR_PIN, LOW); //Set LED_ERROR_PIN value 0
-  
+  */
   Serial.println("Sensor pins initialized");
 }
 /*
