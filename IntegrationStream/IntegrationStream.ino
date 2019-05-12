@@ -22,8 +22,8 @@
 #define LOAD_B_SCK      2               //Load B pin 3 - Clock
 
 #define ID_LIST_NUM     5               //ID list max number
-#define LOAD_A_FACTOR   1               //Calibration factor of load A
-#define LOAD_B_FACTOR   1               //Calibration factor of load B
+#define LOAD_A_FACTOR   -1913.27         //Calibration factor of load A
+#define LOAD_B_FACTOR   2157.6          //Calibration factor of load B
 
 #define MATERIAL_POS_1  0x01            //Mask position of material 1
 #define MATERIAL_POS_2  0x02            //Mask position of material 2
@@ -53,11 +53,24 @@ void SENSOR_Init()
 {
   LoadACell.begin();                        //Start connection to HX711
   LoadACell.start(2000);                    //Load cells gets 2000ms of time to stabilize
-  LoadACell.setCalFactor(LOAD_A_FACTOR);    //Calibration factor for load cell
+  if(LoadACell.getTareTimeoutFlag()) {
+    Serial.println("Tare timeout, check MCU>HX711 wiring and pin designations");
+  }
+  else {
+    LoadACell.setCalFactor(LOAD_A_FACTOR); // set calibration value (float)
+    Serial.println("Startup + tare is complete");
+  }
+  
   Serial.println("Load A initialized");
   LoadBCell.begin();                        //Start connection to HX711
   LoadBCell.start(2000);                    //Load cells gets 2000ms of time to stabilize
-  LoadBCell.setCalFactor(LOAD_B_FACTOR);    //Calibration factor for load cell
+  if(LoadACell.getTareTimeoutFlag()) {
+    Serial.println("Tare timeout, check MCU>HX711 wiring and pin designations");
+  }
+  else {
+    LoadBCell.setCalFactor(LOAD_B_FACTOR); // set calibration value (float)
+    Serial.println("Startup + tare is complete");
+  }
   Serial.println("Load B initialized");
   
   //pinMode(LED_1_PIN, OUTPUT);       //Set LED_1_PIN as output.
@@ -74,7 +87,6 @@ Turn on LEDs depending on data received
 */
 void SENSOR_changeLedState(int material_to_take, int state)
 {
-  
    if(material_to_take & MATERIAL_POS_1)
   {
     digitalWrite(LED_1_PIN, state); 
@@ -184,7 +196,7 @@ void WiFi_Init()
 Send info through Wi-Fi, HTTP request PUT
 -----------------------------------------
 */
-uint32_t WiFi_Send(uint32_t id, float weight_0, float weight_1)
+uint32_t WiFi_Send(uint32_t id, float weight_0, float weight_1, String transaction)
 {
    String string_to_send = "";
    uint32_t parsed_data;
@@ -196,6 +208,7 @@ uint32_t WiFi_Send(uint32_t id, float weight_0, float weight_1)
    doc_send["id"] = id;
    doc_send["peso0"] = weight_0;
    doc_send["peso1"] = weight_1;
+   doc_send["transaction"] = transaction; 
    serializeJson(doc_send,string_to_send);
 
    Serial.println(string_to_send);
@@ -233,7 +246,7 @@ void setup()
   Serial.println("Initialization");
   SENSOR_Init();              //Push buttons, LEDS and LOAD sensors initialization
   RFID_Init();                //RFID initialization
-  WiFi_Init();                //Wi-Fi initialization
+  //WiFi_Init();                //Wi-Fi initialization
 }
 /***************************************************
                     MAIN LOOP
@@ -258,6 +271,8 @@ void loop()
       loop_checkin(card_id);
     }
   } 
+  LoadACell.update();
+  LoadBCell.update();
 }
 /***************************************************
                     CHECK-OUT LOOP
@@ -265,33 +280,26 @@ void loop()
 void loop_checkout(uint32_t rfidCard)
 {
   String material_received = "";
-  LoadACell.update();
-  LoadBCell.update();
-  float weigth_0 = LoadACell.getData();
-  float weigth_1 = LoadBCell.getData();
-  material_received = WiFi_Send(rfidCard, weigth_0, weigth_1);
-  Serial.print("Respuesta recibida por Erick");
-  Serial.println(material_received);
- // if("1" == material_received)
-  //{
-    SENSOR_showMaterial(material_received.toInt());
-  /*}
-  else if("2" == material_received)
-  {
-    SENSOR_showMaterial(2);
-  }
-  else if("3" == material_received)
-  {
-    SENSOR_showMaterial(3);
-  }*/
-  
+  float weight_0 = LoadACell.getData();
+  float weight_1 = LoadBCell.getData();
+  Serial.print("A: ");
+  Serial.println(weight_0);
+  Serial.print("B: ");
+  Serial.println(weight_1);
+  material_received = WiFi_Send(rfidCard, weigth_0, weigth_1, "out");
+  SENSOR_showMaterial(material_received.toInt());
 }
 /***************************************************
                     CHECK-IN LOOP
 ****************************************************/
 void loop_checkin(uint32_t rfidCard)
 {
-  digitalWrite(LED_1_PIN, LOW);     //Set LED_3_PIN value 0
-  digitalWrite(LED_2_PIN, LOW);     //Set LED_3_PIN value 0
-
+  String response = "";
+  float weight_0 = LoadACell.getData();
+  float weight_1 = LoadBCell.getData();
+  Serial.print("A: ");
+  Serial.println(weight_0);
+  Serial.print("B: ");
+  Serial.println(weight_1);
+  material_received = WiFi_Send(rfidCard, weigth_0, weigth_1, "in");
 }

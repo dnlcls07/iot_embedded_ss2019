@@ -49,8 +49,8 @@ void loop() {
 #include <EEPROM.h>
 
 //HX711 constructor (dout pin, sck pin):
-HX711_ADC LoadCell(4,16);
-
+HX711_ADC LoadCell(0,2);
+//HX711_ADC LoadCell(4,16);
 const int eepromAdress = 0;
 
 long t;
@@ -58,7 +58,7 @@ long t;
 void setup() {
   
   float calValue; // calibration value
-  calValue = 696.0; // uncomment this if you want to set this value in the sketch 
+  calValue = (696.0*3.1); // uncomment this if you want to set this value in the sketch 
   #if defined(ESP8266) 
   //EEPROM.begin(512); // uncomment this if you use ESP8266 and want to fetch the value from eeprom
   #endif
@@ -87,6 +87,8 @@ void loop() {
   //get smoothed value from data set
   if (millis() > t + 250) {
     float i = LoadCell.getData();
+    //i = i*-.3637;
+    //i = i*.3225;
     Serial.print("Load_cell output val: ");
     Serial.println(i);
     t = millis();
