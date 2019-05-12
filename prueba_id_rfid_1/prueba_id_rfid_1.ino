@@ -1,12 +1,13 @@
 #include <SPI.h>
 #include <MFRC522.h>
 
-#define RST_PIN  5    //Pin 5 para el reset del RC522
-#define SS_PIN  15   //Pin 15 para el SS (SDA) del RC522
+#define RST_PIN  2    //Pin 5 para el reset del RC522
+#define SS_PIN   0   //Pin 15 para el SS (SDA) del RC522
 MFRC522 mfrc522(SS_PIN, RST_PIN); //Creamos el objeto para el RC522
 
 void setup() {
   Serial.begin(9600); //Iniciamos la comunicación  serial
+  SPI.pins(6,7,8,0);
   SPI.begin();        //Iniciamos el Bus SPI
   mfrc522.PCD_Init(); // Iniciamos  el MFRC522
   Serial.println("Lectura del UID");

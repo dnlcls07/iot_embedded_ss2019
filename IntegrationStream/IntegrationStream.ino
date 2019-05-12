@@ -13,31 +13,26 @@
 ****************************************************/
 #define RST_PIN         5               //RFID Pin 5 RC522 Reset
 #define SS_PIN          15              //RFID Pin 15 RC522 SS (SDA) 
-#define PB_1_PIN        12              //Push Button 1 pin 12
-#define PB_2_PIN        14              //Push Button 2 pin 14
-#define LED_1_PIN       4               //Led 1 pin 4
-#define LED_2_PIN       12              //Led 2 pin 12
-#define LED_3_PIN       10              //Led 3 pin 10
-#define LED_4_PIN       13              //Led 4 pin 13
-#define LED_ERROR_PIN   16              //Error led pin 16 (In mcu)
-#define LOAD_A_DATA     1               //Load A pin 1 - Data
-#define LOAD_A_SCK      3               //Load A pin 3 - Clock
+#define LED_1_PIN       1               //Led 1 pin 1
+#define LED_2_PIN       3               //Led 2 pin 3
+#define LED_ERROR_PIN   16              //Error led pin 16 (In mcu)-
+#define LOAD_A_DATA     4               //Load A pin 4 - Data
+#define LOAD_A_SCK      16              //Load A pin 16 - Clock
 #define LOAD_B_DATA     0               //Load B pin 1 - Data
 #define LOAD_B_SCK      2               //Load B pin 3 - Clock
 
 #define ID_LIST_NUM     5               //ID list max number
-#define LOAD_A_FACTOR   999             //Calibration factor of load A
-#define LOAD_B_FACTOR   999             //Calibration factor of load B
+#define LOAD_A_FACTOR   1               //Calibration factor of load A
+#define LOAD_B_FACTOR   1               //Calibration factor of load B
 
 #define MATERIAL_POS_1  0x01            //Mask position of material 1
 #define MATERIAL_POS_2  0x02            //Mask position of material 2
-#define MATERIAL_POS_3  0x04            //Mask position of material 3
-#define MATERIAL_POS_4  0x08            //Mask position of material 4
+
 /***************************************************
                VARIABLES & CONSTANTS
 ****************************************************/
-const char* ssid = "G7 ThinQ_0004";
-const char* password = "daceta1995";
+const char* ssid = "INFINITUM3587";   //itesoIoT
+const char* password = "123456789";  //1t3s0IoT18
 
 uint32_t id_list[ID_LIST_NUM] = {0};                //List of ID's
 StaticJsonDocument<200> doc_send;
@@ -56,28 +51,20 @@ Initialize Sensors and Actuators pins
 */
 void SENSOR_Init()
 {
-  /*
   LoadACell.begin();                        //Start connection to HX711
   LoadACell.start(2000);                    //Load cells gets 2000ms of time to stabilize
   LoadACell.setCalFactor(LOAD_A_FACTOR);    //Calibration factor for load cell
+  Serial.println("Load A initialized");
   LoadBCell.begin();                        //Start connection to HX711
   LoadBCell.start(2000);                    //Load cells gets 2000ms of time to stabilize
   LoadBCell.setCalFactor(LOAD_B_FACTOR);    //Calibration factor for load cell
-  */
+  Serial.println("Load B initialized");
+  
+  //pinMode(LED_1_PIN, OUTPUT);       //Set LED_1_PIN as output.
+  //pinMode(LED_2_PIN, OUTPUT);       //Set LED_2_PIN as output. Pin 9 manda a reset el micro. NO USAR!!!!
 
-  /*
-  pinMode(LED_1_PIN, OUTPUT);       //Set LED_1_PIN as output.
-  pinMode(LED_2_PIN, OUTPUT);       //Set LED_2_PIN as output. Pin 9 manda a reset el micro. NO USAR!!!!
-  pinMode(LED_3_PIN, OUTPUT);       //Set LED_3_PIN as output
-  pinMode(LED_4_PIN, OUTPUT);       //Set LED_4_PIN as output
-  pinMode(LED_ERROR_PIN, OUTPUT);   //Set LED_ERROR_PIN as output
-
-  digitalWrite(LED_1_PIN, LOW);     //Set LED_1_PIN value 0
-  digitalWrite(LED_2_PIN, LOW);     //Set LED_2_PIN value 0 Pin 9 manda a reset el micro. NO USAR!!!!
-  digitalWrite(LED_3_PIN, LOW);     //Set LED_3_PIN value 0
-  digitalWrite(LED_4_PIN, LOW);     //Set LED_4_PIN value 0
-  digitalWrite(LED_ERROR_PIN, LOW); //Set LED_ERROR_PIN value 0
-  */
+  //digitalWrite(LED_1_PIN, LOW);     //Set LED_1_PIN value 0
+  //digitalWrite(LED_2_PIN, LOW);     //Set LED_2_PIN value 0 Pin 9 manda a reset el micro. NO USAR!!!!  
   Serial.println("Sensor pins initialized");
 }
 /*
@@ -99,18 +86,6 @@ void SENSOR_changeLedState(int material_to_take, int state)
     digitalWrite(LED_2_PIN, state);
     // TODO: remove
     Serial.println("Take second material"); 
-  }
-  if(material_to_take & MATERIAL_POS_3)
-  {
-    digitalWrite(LED_3_PIN, state);
-    // TODO: remove
-    Serial.println("Take third material"); 
-  }
-  if(material_to_take & MATERIAL_POS_4)
-  {
-    digitalWrite(LED_4_PIN, state);
-    // TODO: remove
-    Serial.println("Take fourth material"); 
   }
 }
 /*
@@ -144,14 +119,10 @@ uint32_t RFID_readCard()
   uint32_t id_card = 0; 
   if ( mfrc522.PICC_ReadCardSerial()) 
     {
-      Serial.print("Card UID:");
       for (byte i = 0; i < mfrc522.uid.size; i++)                 //Print card information
-      {
-        Serial.print(mfrc522.uid.uidByte[i] < 0x10 ? " 0" : " ");
-        Serial.print(mfrc522.uid.uidByte[i], HEX);   
+      {   
         id_card = ((id_card << (8)) | mfrc522.uid.uidByte[i]);
       } 
-      Serial.println(id_card);
       mfrc522.PICC_HaltA();                                       //End card reading
     }   
     return id_card;
@@ -213,16 +184,18 @@ void WiFi_Init()
 Send info through Wi-Fi, HTTP request PUT
 -----------------------------------------
 */
-String WiFi_Send(uint32_t id, int weight)
+uint32_t WiFi_Send(uint32_t id, float weight_0, float weight_1)
 {
    String string_to_send = "";
-   String string_received = "";
+   uint32_t parsed_data;
+   
    if(WiFi.status()== WL_CONNECTED){
    HTTPClient http;   
-   http.begin("http://us-central1-iot-primavera.cloudfunctions.net/function-1");
+   http.begin("http://2806b32d.ngrok.io/weight");
    http.addHeader("Content-Type", "application/json");            
    doc_send["id"] = id;
-   doc_send["weight"] = weight;
+   doc_send["peso0"] = weight_0;
+   doc_send["peso1"] = weight_1;
    serializeJson(doc_send,string_to_send);
 
    Serial.println(string_to_send);
@@ -233,8 +206,7 @@ String WiFi_Send(uint32_t id, int weight)
  
     String response = http.getString();
     DeserializationError err = deserializeJson(doc_receive,response);
-    const char* parsed_data = doc_receive["data"];
-    string_received = parsed_data;
+    parsed_data = doc_receive["data"];
  
     Serial.println(httpResponseCode);
     Serial.println(response);          
@@ -249,7 +221,7 @@ String WiFi_Send(uint32_t id, int weight)
  }else{
     Serial.println("Error in WiFi connection");
  }
- return string_received;
+ return parsed_data;
 }
 
 /***************************************************
@@ -262,7 +234,6 @@ void setup()
   SENSOR_Init();              //Push buttons, LEDS and LOAD sensors initialization
   RFID_Init();                //RFID initialization
   WiFi_Init();                //Wi-Fi initialization
-  Serial.println("Lectura del UID");
 }
 /***************************************************
                     MAIN LOOP
@@ -273,7 +244,6 @@ void loop()
   bool card_added;
   if ( mfrc522.PICC_IsNewCardPresent())           //Check if there is a new card
   {  
-    Serial.println("Reading card");
     card_id = RFID_readCard();                    //Read new card UID
     Serial.print("Card ID:");
     Serial.println(card_id);
@@ -295,21 +265,33 @@ void loop()
 void loop_checkout(uint32_t rfidCard)
 {
   String material_received = "";
-  int material_to_use = 0;
-  // TODO: Reemplazar 10 por dato de sensor de peso
-  material_received = WiFi_Send(rfidCard, 10);
+  LoadACell.update();
+  LoadBCell.update();
+  float weigth_0 = LoadACell.getData();
+  float weigth_1 = LoadBCell.getData();
+  material_received = WiFi_Send(rfidCard, weigth_0, weigth_1);
+  Serial.print("Respuesta recibida por Erick");
+  Serial.println(material_received);
+ // if("1" == material_received)
+  //{
+    SENSOR_showMaterial(material_received.toInt());
+  /*}
+  else if("2" == material_received)
   {
-    if (material_received == "Ok")
-    {
-     material_to_use = 7;
-    }
+    SENSOR_showMaterial(2);
   }
-  SENSOR_showMaterial(material_to_use);
+  else if("3" == material_received)
+  {
+    SENSOR_showMaterial(3);
+  }*/
+  
 }
 /***************************************************
                     CHECK-IN LOOP
 ****************************************************/
 void loop_checkin(uint32_t rfidCard)
 {
-  
+  digitalWrite(LED_1_PIN, LOW);     //Set LED_3_PIN value 0
+  digitalWrite(LED_2_PIN, LOW);     //Set LED_3_PIN value 0
+
 }
