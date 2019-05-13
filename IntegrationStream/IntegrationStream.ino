@@ -31,8 +31,8 @@
 /***************************************************
                VARIABLES & CONSTANTS
 ****************************************************/
-const char* ssid = "INFINITUM3587";   //itesoIoT
-const char* password = "123456789";  //1t3s0IoT18
+const char* ssid = "G7 ThinQ_0004";   //itesoIoT - INFINITUM3587
+const char* password = "daceta1995";  //1t3s0IoT18 - 123456789
 
 uint32_t id_list[ID_LIST_NUM] = {0};                //List of ID's
 StaticJsonDocument<200> doc_send;
@@ -105,6 +105,36 @@ void SENSOR_showMaterial(int material_to_take)
 {
   SENSOR_changeLedState(material_to_take, HIGH);
 }
+/*---------
+Toggle leds
+-----------
+*/
+void SENSOR_ledToggle(byte led)
+{
+  static bool state = false;
+  if(state)
+  {
+    if(LED_1_PIN == led)
+    {
+      digitalWrite(LED_1_PIN, HIGH);
+    }
+    if(LED_2_PIN == led)
+    {
+      digitalWrite(LED_2_PIN, HIGH);
+    }
+  }
+  else
+  {
+     if(LED_1_PIN == led)
+    {
+      digitalWrite(LED_1_PIN, LOW);
+    }
+    if(LED_2_PIN == led)
+    {
+      digitalWrite(LED_2_PIN, LOW);
+    }
+  }
+}
 /*
 -------------------------
 Validate material to take
@@ -140,11 +170,13 @@ bool SENSOR_validateTakenMaterial(int material_to_take, float weight_0, float we
       if(true == ledA)
       {
         boolA = boolA*-1;
+        SENSOR_ledToggle(LED_1_PIN);
         Serial.print(boolA);
       }
       if(true == ledB)
       {
         boolB = boolB*-1;
+        SENSOR_ledToggle(LED_2_PIN);
         Serial.print(boolB);
       }
     }
@@ -312,7 +344,7 @@ uint32_t WiFi_Send(uint32_t id, float weight_0, float weight_1, String transacti
    
    if(WiFi.status()== WL_CONNECTED){
    HTTPClient http;   
-   http.begin("http://2806b32d.ngrok.io/weight");
+   http.begin("http://d7036a7f.ngrok.io/weight");
    http.addHeader("Content-Type", "application/json");            
    doc_send["id"] = id;
    doc_send["peso0"] = weight_0;
@@ -355,7 +387,7 @@ void setup()
   Serial.println("Initialization");
   SENSOR_Init();              //Push buttons, LEDS and LOAD sensors initialization
   RFID_Init();                //RFID initialization
-  //WiFi_Init();                //Wi-Fi initialization
+  WiFi_Init();                //Wi-Fi initialization
 }
 /***************************************************
                     MAIN LOOP
@@ -395,10 +427,9 @@ void loop_checkout(uint32_t rfidCard)
   Serial.println(weight_0);
   Serial.print("B: ");
   Serial.println(weight_1);
-  //material_received = WiFi_Send(rfidCard, weigth_0, weigth_1, "out");
-  //SENSOR_showMaterial(material_received.toInt());
-  //SENSOR_showMaterial(2);
-  SENSOR_validateTakenMaterial(2,weight_0,weight_1);
+  material_received = WiFi_Send(rfidCard, weight_0, weight_1, "out");
+  SENSOR_showMaterial(material_received.toInt());
+  SENSOR_validateTakenMaterial(material_received.toInt(),weight_0,weight_1);
 }
 /***************************************************
                     CHECK-IN LOOP
@@ -412,5 +443,6 @@ void loop_checkin(uint32_t rfidCard)
   Serial.println(weight_0);
   Serial.print("B: ");
   Serial.println(weight_1);
-  //material_received = WiFi_Send(rfidCard, weight_0, weight_1, "in");
+  response = WiFi_Send(rfidCard, weight_0, weight_1, "in");
+  Serial.println(response);
 }
