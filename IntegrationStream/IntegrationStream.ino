@@ -89,15 +89,11 @@ void SENSOR_changeLedState(int material_to_take, int state)
 {
    if(material_to_take & MATERIAL_POS_1)
   {
-    digitalWrite(LED_1_PIN, state); 
-    // TODO: remove   
-    Serial.println("Take first material"); 
+    digitalWrite(LED_1_PIN, state);       //LOAD CELL A
   }
-  if(material_to_take & MATERIAL_POS_2)
+  if(material_to_take & MATERIAL_POS_2)   //LOAD CELL B
   {
-    digitalWrite(LED_2_PIN, state);
-    // TODO: remove
-    Serial.println("Take second material"); 
+    digitalWrite(LED_2_PIN, state); 
   }
 }
 /*
@@ -109,6 +105,119 @@ void SENSOR_showMaterial(int material_to_take)
 {
   SENSOR_changeLedState(material_to_take, HIGH);
 }
+/*
+-------------------------
+Validate material to take
+-------------------------
+*/
+bool SENSOR_validateTakenMaterial(int material_to_take, float weight_0, float weight_1)
+{
+  bool cellA = true;
+  bool cellB = true;
+  bool ledA = false;
+  bool ledB = false;
+  bool wait_read = false;
+  byte count = 0;
+  long t = millis();
+  long  timer = millis();
+  float iA = 0;
+  float iB = 0;
+  int boolA = 1;
+  int boolB = 1;
+  Serial.println("Validate Cells");
+  
+  while((count < 6) && (cellA || cellB))
+  {
+    LoadACell.update();
+    LoadBCell.update();
+    yield();//WDT
+    if (millis() > t + 250) 
+    {
+      Serial.print(".");
+      iA = LoadACell.getData();
+      iB = LoadBCell.getData();
+      t = millis();
+      if(true == ledA)
+      {
+        boolA = boolA*-1;
+        Serial.print(boolA);
+      }
+      if(true == ledB)
+      {
+        boolB = boolB*-1;
+        Serial.print(boolB);
+      }
+    }
+    
+    if (millis() > timer + 5000)         //15 sec timer
+    {
+      Serial.println("Big loop");
+      timer = millis();
+      wait_read = true;
+      count++;
+    }
+    
+    if(true == wait_read)
+    {
+      Serial.println("Reading!");
+      wait_read = false;
+      Serial.print("A:");
+      Serial.println(iA);
+      Serial.print("B:");
+      Serial.println(iB);
+      
+      if(iA < (weight_0 - 10))      //Employee took the material A
+      {
+        if(material_to_take & 1)
+        {
+          cellA = false;
+          ledA = false;
+        }
+        else
+        {
+          ledA = true;
+        }
+      }
+      else                          //Employee didn't take material A
+      {
+        if(material_to_take & 1)
+        {
+          Serial.println("Waiting to take A");
+        }
+        else
+        {
+          cellA = false;
+        }
+      }
+      if(iB < (weight_1 - 10))      //Employee took the material B
+      {
+        if(material_to_take & 2)
+        {
+          cellB = false;
+          ledB = false;
+        }
+        else
+        {
+          ledB = true;
+        }
+      }
+      else                          //Employee didn't take material B
+      {
+        if(material_to_take & 2)
+        {
+          Serial.println("Waiting to take B");
+        }
+        else
+        {
+          cellB = false;
+        }
+      }
+    }
+  
+  }
+  Serial.println("OK");
+}
+
 /*
 ----------------------
 Initialize RFID module
@@ -286,8 +395,10 @@ void loop_checkout(uint32_t rfidCard)
   Serial.println(weight_0);
   Serial.print("B: ");
   Serial.println(weight_1);
-  material_received = WiFi_Send(rfidCard, weigth_0, weigth_1, "out");
-  SENSOR_showMaterial(material_received.toInt());
+  //material_received = WiFi_Send(rfidCard, weigth_0, weigth_1, "out");
+  //SENSOR_showMaterial(material_received.toInt());
+  //SENSOR_showMaterial(2);
+  SENSOR_validateTakenMaterial(2,weight_0,weight_1);
 }
 /***************************************************
                     CHECK-IN LOOP
@@ -301,5 +412,5 @@ void loop_checkin(uint32_t rfidCard)
   Serial.println(weight_0);
   Serial.print("B: ");
   Serial.println(weight_1);
-  material_received = WiFi_Send(rfidCard, weigth_0, weigth_1, "in");
+  //material_received = WiFi_Send(rfidCard, weight_0, weight_1, "in");
 }
